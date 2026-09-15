@@ -14,13 +14,13 @@ app.use(cors());
 app.use(express.json());
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
-// Your deployed GigSplit smart contract address (set after anchor deploy)
+// Your deployed GigSplit smart contract address
 const PROGRAM_ID = new PublicKey(
-  process.env.PROGRAM_ID ?? '11111111111111111111111111111111'
+  process.env.PROGRAM_ID ?? '6cQUNfcpM7Q9iLyQPWjV2VcTDL6QyQwmCpJjKZpqpemX'
 );
 // Your personal wallet — receives the 5% platform fee
 const PLATFORM_FEE_WALLET = new PublicKey(
-  process.env.PLATFORM_FEE_WALLET ?? '11111111111111111111111111111111'
+  process.env.PLATFORM_FEE_WALLET ?? '767Va4iPX5NNVyP1afPjn6aJqEhVTgGydaTwZB1Kxqss'
 );
 // Use environment variable for RPC — defaults to devnet
 const RPC_URL = process.env.RPC_URL ?? 'https://api.devnet.solana.com';

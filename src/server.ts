@@ -42,8 +42,31 @@ app.get('/', (_req: Request, res: Response) => {
 app.get('/api/pay', (_req: Request, res: Response) => {
   res.status(200).json({
     label: 'GigSplit Payment',
-    icon: 'https://your-domain.com/logo.png', // replace with your logo URL
+    icon: 'https://gigsplit-backend.onrender.com/logo.png', // replace with your logo URL
   });
+});
+
+// ─── HELPER WEB PAGE FOR TESTING ON MOBILE ────────────────────────────────────
+app.get('/pay-link', (req: Request, res: Response) => {
+  const artist = req.query.artist;
+  const amount = req.query.amount;
+  
+  const solanaUrl = `solana:https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}`;
+  
+  res.send(`
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #0A0A0A; margin: 0; }
+          .btn { background: #9945FF; color: white; padding: 20px 40px; border-radius: 20px; text-decoration: none; font-size: 20px; font-weight: bold; box-shadow: 0 4px 14px rgba(153, 69, 255, 0.4); }
+        </style>
+      </head>
+      <body>
+        <a class="btn" href="${solanaUrl}">Tap to Open in Phantom</a>
+      </body>
+    </html>
+  `);
 });
 
 // ─── SOLANA PAY: POST (wallet sends payer address, gets back transaction) ────

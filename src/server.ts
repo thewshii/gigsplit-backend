@@ -51,10 +51,12 @@ app.get('/pay-link', (req: Request, res: Response) => {
   const artist = req.query.artist;
   const amount = req.query.amount;
   
-  // The Solana Pay spec requires the URL after "solana:" to be fully URL-encoded!
   const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}`;
   const solanaUrl = `solana:${encodeURIComponent(rawApiUrl)}`;
-  const phantomUniversalUrl = `https://phantom.app/ul/v1/pay?url=${encodeURIComponent(rawApiUrl)}`;
+  
+  // To force Phantom instead of Coinbase Wallet, we open an intermediate page INSIDE Phantom's browser
+  const phantomInnerUrl = `https://gigsplit-backend.onrender.com/pay-link-phantom?artist=${artist}&amount=${amount}`;
+  const phantomBrowseUrl = `https://phantom.app/ul/browse/${encodeURIComponent(phantomInnerUrl)}`;
   
   res.send(`
     <html>
@@ -68,9 +70,41 @@ app.get('/pay-link', (req: Request, res: Response) => {
         </style>
       </head>
       <body>
-        <a class="btn" href="${solanaUrl}">Tap to Open in Phantom</a>
-        <a class="btn btn-outline" href="${phantomUniversalUrl}">Use Alternate Link (if first fails)</a>
-        <p class="sub">Make sure you have the Phantom app installed on this device.</p>
+        <a class="btn" href="${phantomBrowseUrl}">Tap to Open in Phantom</a>
+        <a class="btn btn-outline" href="${solanaUrl}">Open Default Wallet (Coinbase, etc)</a>
+      </body>
+    </html>
+  `);
+});
+
+// ─── PHANTOM IN-APP BROWSER TRAMPOLINE ────────────────────────────────────────
+app.get('/pay-link-phantom', (req: Request, res: Response) => {
+  const artist = req.query.artist;
+  const amount = req.query.amount;
+  
+  const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}`;
+  const solanaUrl = `solana:${encodeURIComponent(rawApiUrl)}`;
+  
+  res.send(`
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #0A0A0A; margin: 0; color: white; }
+          .btn { background: #1B4332; color: #86EFAC; padding: 20px 40px; border-radius: 20px; text-decoration: none; font-size: 20px; font-weight: bold; text-align: center; border: 2px solid #86EFAC; }
+        </style>
+        <script>
+          // Auto-trigger the Solana Pay sheet once inside Phantom
+          window.onload = () => {
+            setTimeout(() => {
+              window.location.href = "${solanaUrl}";
+            }, 500);
+          };
+        </script>
+      </head>
+      <body>
+        <a class="btn" href="${solanaUrl}">Confirm Transaction</a>
+        <p style="color:#888; margin-top: 20px;">Loading payment...</p>
       </body>
     </html>
   `);

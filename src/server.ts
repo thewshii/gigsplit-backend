@@ -51,19 +51,26 @@ app.get('/pay-link', (req: Request, res: Response) => {
   const artist = req.query.artist;
   const amount = req.query.amount;
   
-  const solanaUrl = `solana:https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}`;
+  // The Solana Pay spec requires the URL after "solana:" to be fully URL-encoded!
+  const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}`;
+  const solanaUrl = `solana:${encodeURIComponent(rawApiUrl)}`;
+  const phantomUniversalUrl = `https://phantom.app/ul/v1/pay?url=${encodeURIComponent(rawApiUrl)}`;
   
   res.send(`
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-          body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #0A0A0A; margin: 0; }
-          .btn { background: #9945FF; color: white; padding: 20px 40px; border-radius: 20px; text-decoration: none; font-size: 20px; font-weight: bold; box-shadow: 0 4px 14px rgba(153, 69, 255, 0.4); }
+          body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #0A0A0A; margin: 0; color: white; gap: 20px; }
+          .btn { background: #9945FF; color: white; padding: 20px 40px; border-radius: 20px; text-decoration: none; font-size: 18px; font-weight: bold; box-shadow: 0 4px 14px rgba(153, 69, 255, 0.4); text-align: center; }
+          .btn-outline { background: transparent; border: 2px solid #555; color: #ccc; }
+          .sub { color: #888; font-size: 14px; text-align: center; max-width: 80%; }
         </style>
       </head>
       <body>
         <a class="btn" href="${solanaUrl}">Tap to Open in Phantom</a>
+        <a class="btn btn-outline" href="${phantomUniversalUrl}">Use Alternate Link (if first fails)</a>
+        <p class="sub">Make sure you have the Phantom app installed on this device.</p>
       </body>
     </html>
   `);

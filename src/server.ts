@@ -17,7 +17,7 @@ app.use(express.json());
 // We no longer need a custom smart contract! 
 // Your personal wallet — receives the 5% platform fee
 const PLATFORM_FEE_WALLET = new PublicKey(
-  process.env.PLATFORM_FEE_WALLET ?? '767Va4iPX5NNVyP1afPjn6aJqEhVTgGydaTwZB1Kxqss'
+  process.env.PLATFORM_FEE_WALLET ?? '9CCWeKbQhS6WGFGbgk68M9SDmT9B45C1gYPDo5PdSpWZ'
 );
 // Use mainnet-beta by default now!
 const RPC_URL = process.env.RPC_URL ?? 'https://api.mainnet-beta.solana.com';

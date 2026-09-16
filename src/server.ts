@@ -50,12 +50,13 @@ app.get('/api/pay', (_req: Request, res: Response) => {
 app.get('/pay-link', (req: Request, res: Response) => {
   const artist = req.query.artist;
   const amount = req.query.amount;
+  const ref = req.query.reference ? `&reference=${req.query.reference}` : '';
   
-  const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}`;
+  const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}${ref}`;
   const solanaUrl = `solana:${encodeURIComponent(rawApiUrl)}`;
   
   // To force Phantom instead of Coinbase Wallet, we open an intermediate page INSIDE Phantom's browser
-  const phantomInnerUrl = `https://gigsplit-backend.onrender.com/pay-link-phantom?artist=${artist}&amount=${amount}`;
+  const phantomInnerUrl = `https://gigsplit-backend.onrender.com/pay-link-phantom?artist=${artist}&amount=${amount}${ref}`;
   const phantomBrowseUrl = `https://phantom.app/ul/browse/${encodeURIComponent(phantomInnerUrl)}`;
   
   res.send(`
@@ -81,8 +82,9 @@ app.get('/pay-link', (req: Request, res: Response) => {
 app.get('/pay-link-phantom', (req: Request, res: Response) => {
   const artist = req.query.artist;
   const amount = req.query.amount;
+  const ref = req.query.reference ? `&reference=${req.query.reference}` : '';
   
-  const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}`;
+  const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}${ref}`;
   const solanaUrl = `solana:${encodeURIComponent(rawApiUrl)}`;
   
   res.send(`
@@ -116,6 +118,7 @@ app.post('/api/pay', async (req: Request, res: Response) => {
     const { account } = req.body;
     const artistQuery = req.query.artist as string;
     const amountQuery = req.query.amount as string; // in SOL
+    const referenceQuery = req.query.reference as string; // standard Solana Pay reference
 
     if (!account)       return res.status(400).json({ error: 'Missing payer account' });
     if (!artistQuery)   return res.status(400).json({ error: 'Missing artist wallet' });
@@ -131,14 +134,21 @@ app.post('/api/pay', async (req: Request, res: Response) => {
     amountBuffer.writeBigUInt64LE(amountLamports);
     const data = Buffer.concat([discriminator, amountBuffer]);
 
+    const keys = [
+      { pubkey: payerPubkey,         isSigner: true,  isWritable: true  },
+      { pubkey: artistPubkey,        isSigner: false, isWritable: true  },
+      { pubkey: PLATFORM_FEE_WALLET, isSigner: false, isWritable: true  },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ];
+    
+    // If frontend provides a reference key (standard Solana Pay tracking), append it
+    if (referenceQuery) {
+      keys.push({ pubkey: new PublicKey(referenceQuery), isSigner: false, isWritable: false });
+    }
+
     const instruction = new TransactionInstruction({
       programId: PROGRAM_ID,
-      keys: [
-        { pubkey: payerPubkey,         isSigner: true,  isWritable: true  },
-        { pubkey: artistPubkey,        isSigner: false, isWritable: true  },
-        { pubkey: PLATFORM_FEE_WALLET, isSigner: false, isWritable: true  },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
+      keys,
       data,
     });
 

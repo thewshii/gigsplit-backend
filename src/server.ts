@@ -14,35 +14,25 @@ app.use(cors());
 app.use(express.json());
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
-// Your deployed GigSplit smart contract address
-const PROGRAM_ID = new PublicKey(
-  process.env.PROGRAM_ID ?? '6cQUNfcpM7Q9iLyQPWjV2VcTDL6QyQwmCpJjKZpqpemX'
-);
+// We no longer need a custom smart contract! 
 // Your personal wallet — receives the 5% platform fee
 const PLATFORM_FEE_WALLET = new PublicKey(
   process.env.PLATFORM_FEE_WALLET ?? '767Va4iPX5NNVyP1afPjn6aJqEhVTgGydaTwZB1Kxqss'
 );
-// Use environment variable for RPC — defaults to devnet
-const RPC_URL = process.env.RPC_URL ?? 'https://api.devnet.solana.com';
+// Use mainnet-beta by default now!
+const RPC_URL = process.env.RPC_URL ?? 'https://api.mainnet-beta.solana.com';
 const connection = new Connection(RPC_URL, 'confirmed');
-
-// ─── ANCHOR DISCRIMINATOR ──────────────────────────────────────────────────────
-// Anchor uses the first 8 bytes of SHA256("global:<function_name>") as a prefix
-function getDiscriminator(name: string): Buffer {
-  const hash = crypto.createHash('sha256').update(`global:${name}`).digest();
-  return hash.subarray(0, 8);
-}
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get('/', (_req: Request, res: Response) => {
-  res.json({ status: 'GigSplit API is live ✅' });
+  res.json({ status: 'GigSplit API is live on Mainnet ✅' });
 });
 
 // ─── SOLANA PAY: GET (wallet fetches label + icon) ───────────────────────────
 app.get('/api/pay', (_req: Request, res: Response) => {
   res.status(200).json({
     label: 'GigSplit Payment',
-    icon: 'https://gigsplit-backend.onrender.com/logo.png', // replace with your logo URL
+    icon: 'https://gigsplit-backend.onrender.com/logo.png', 
   });
 });
 
@@ -55,7 +45,6 @@ app.get('/pay-link', (req: Request, res: Response) => {
   const rawApiUrl = `https://gigsplit-backend.onrender.com/api/pay?artist=${artist}&amount=${amount}${ref}`;
   const solanaUrl = `solana:${encodeURIComponent(rawApiUrl)}`;
   
-  // To force Phantom instead of Coinbase Wallet, we open an intermediate page INSIDE Phantom's browser
   const phantomInnerUrl = `https://gigsplit-backend.onrender.com/pay-link-phantom?artist=${artist}&amount=${amount}${ref}`;
   const phantomBrowseUrl = `https://phantom.app/ul/browse/${encodeURIComponent(phantomInnerUrl)}`;
   
@@ -96,12 +85,7 @@ app.get('/pay-link-phantom', (req: Request, res: Response) => {
           .btn { background: #1B4332; color: #86EFAC; padding: 20px 40px; border-radius: 20px; text-decoration: none; font-size: 20px; font-weight: bold; text-align: center; border: 2px solid #86EFAC; }
         </style>
         <script>
-          // Auto-trigger the Solana Pay sheet once inside Phantom
-          window.onload = () => {
-            setTimeout(() => {
-              window.location.href = "${solanaUrl}";
-            }, 500);
-          };
+          window.onload = () => { setTimeout(() => { window.location.href = "${solanaUrl}"; }, 500); };
         </script>
       </head>
       <body>
@@ -126,33 +110,30 @@ app.post('/api/pay', async (req: Request, res: Response) => {
 
     const payerPubkey  = new PublicKey(account);
     const artistPubkey = new PublicKey(artistQuery);
-    const amountLamports = BigInt(Math.round(parseFloat(amountQuery) * 1e9));
-
-    // Build Anchor instruction data: 8-byte discriminator + u64 amount (little-endian)
-    const discriminator = getDiscriminator('split_payment');
-    const amountBuffer  = Buffer.alloc(8);
-    amountBuffer.writeBigUInt64LE(amountLamports);
-    const data = Buffer.concat([discriminator, amountBuffer]);
-
-    const keys = [
-      { pubkey: payerPubkey,         isSigner: true,  isWritable: true  },
-      { pubkey: artistPubkey,        isSigner: false, isWritable: true  },
-      { pubkey: PLATFORM_FEE_WALLET, isSigner: false, isWritable: true  },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    ];
     
-    // If frontend provides a reference key (standard Solana Pay tracking), append it
-    if (referenceQuery) {
-      keys.push({ pubkey: new PublicKey(referenceQuery), isSigner: false, isWritable: false });
-    }
+    // Calculate split securely on the backend
+    const amountLamports = BigInt(Math.round(parseFloat(amountQuery) * 1e9));
+    const artistLamports = (amountLamports * 95n) / 100n;
+    const feeLamports    = amountLamports - artistLamports;
 
-    const instruction = new TransactionInstruction({
-      programId: PROGRAM_ID,
-      keys,
-      data,
+    // Create native Solana transfers (No smart contract needed!)
+    const transferArtist = SystemProgram.transfer({
+      fromPubkey: payerPubkey,
+      toPubkey: artistPubkey,
+      lamports: artistLamports,
+    });
+    const transferFee = SystemProgram.transfer({
+      fromPubkey: payerPubkey,
+      toPubkey: PLATFORM_FEE_WALLET,
+      lamports: feeLamports,
     });
 
-    const transaction = new Transaction().add(instruction);
+    // Append tracking reference to the first instruction so the frontend can find it
+    if (referenceQuery) {
+      transferArtist.keys.push({ pubkey: new PublicKey(referenceQuery), isSigner: false, isWritable: false });
+    }
+
+    const transaction = new Transaction().add(transferArtist, transferFee);
     const { blockhash } = await connection.getLatestBlockhash();
     transaction.feePayer    = payerPubkey;
     transaction.recentBlockhash = blockhash;
